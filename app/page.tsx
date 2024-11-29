@@ -1,123 +1,116 @@
 'use client'
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, TrendingUp, LineChart, DollarSign, AlertTriangle, Lightbulb } from 'lucide-react'
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { analyzeStock } from "./actions/analyze-stock"
+import { useState } from 'react'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { analyzeStock } from './actions/analyze-stock'
+import { FinancialCharts } from '@/components/charts/FinancialCharts'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export default function StockAnalyzer() {
-  const [ticker, setTicker] = useState("")
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [analysis, setAnalysis] = useState<string | null>(null)
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setAnalysis(null)
-    
+export default function Home() {
+  const [ticker, setTicker] = useState('')
+  const [analysis, setAnalysis] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [stockData, setStockData] = useState<any>(null)
+
+  const handleAnalyze = async () => {
     if (!ticker) {
-      setError("Please enter a stock ticker")
+      setError('Please enter a stock ticker')
       return
     }
 
-    setIsAnalyzing(true)
+    setLoading(true)
+    setError('')
+    setAnalysis('')
+    setStockData(null)
+
     try {
+      // First fetch the stock data
+      const response = await fetch(`/api/stock/${ticker.toUpperCase()}`)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to fetch stock data')
+      }
+      const data = await response.json()
+      setStockData(data)
+
+      // Then get the AI analysis
       const result = await analyzeStock(ticker)
       setAnalysis(result)
-    } catch (err) {
-      setError("Failed to analyze stock. Please try again.")
+    } catch (error: any) {
+      console.error('Error:', error)
+      setError(error.message || 'An error occurred while analyzing the stock')
     } finally {
-      setIsAnalyzing(false)
+      setLoading(false)
     }
   }
 
   return (
-    <main className="container mx-auto p-4 min-h-screen">
-      <div className="max-w-4xl mx-auto space-y-8">
-        <div className="space-y-2 text-center">
-          <h1 className="text-4xl font-bold">AI Stock Analyzer</h1>
-          <p className="text-xl text-muted-foreground">
-            Get instant AI-powered financial analysis for any publicly traded stock
-          </p>
+    <main className="min-h-screen p-8">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold mb-8">AI Stock Analyzer</h1>
+        
+        <div className="flex gap-4 mb-8">
+          <Input
+            placeholder="Enter stock ticker (e.g., AAPL)"
+            value={ticker}
+            onChange={(e) => setTicker(e.target.value)}
+            className="max-w-xs"
+          />
+          <Button 
+            onClick={handleAnalyze}
+            disabled={loading}
+          >
+            {loading ? 'Analyzing...' : 'Analyze'}
+          </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Enter Stock Details</CardTitle>
-            <CardDescription>
-              Provide a stock ticker symbol to analyze its financial performance
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="ticker">Stock Ticker</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="ticker"
-                    placeholder="Enter ticker symbol (e.g. AAPL)"
-                    value={ticker}
-                    onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                    className="flex-1"
-                  />
-                  <Button type="submit" disabled={isAnalyzing}>
-                    {isAnalyzing ? "Analyzing..." : "Analyze"}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
         {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+          <Alert variant="destructive" className="mb-8">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        {isAnalyzing && (
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="animate-pulse space-y-3">
-                  <div className="h-4 bg-muted rounded w-3/4"></div>
-                  <div className="h-4 bg-muted rounded w-1/2"></div>
-                  <div className="h-4 bg-muted rounded w-5/6"></div>
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* AI Analysis Panel */}
+          <div className="bg-white rounded-lg p-6 shadow-sm">
+            <h2 className="text-2xl font-semibold mb-4">AI Analysis</h2>
+            {loading ? (
+              <p>Analyzing stock data...</p>
+            ) : analysis ? (
+              <div className="prose max-w-none">
+                {analysis.split('\n').map((paragraph, index) => (
+                  <p key={index}>{paragraph}</p>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
-        
-        {analysis && (
-          <Card className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <h2 className="text-2xl font-bold">{ticker} Analysis</h2>
-                  <p className="text-sm text-muted-foreground">Generated on {new Date().toLocaleDateString()}</p>
-                </div>
-                <Badge variant="secondary" className="text-sm">AI Generated</Badge>
-              </div>
-              
-              <ScrollArea className="h-[600px] w-full rounded-md border p-4">
-                <div className="prose prose-sm max-w-none">
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{analysis}</div>
-                </div>
-              </ScrollArea>
-            </div>
-          </Card>
-        )}
+            ) : (
+              <p className="text-gray-500">Enter a stock ticker to see the analysis</p>
+            )}
+          </div>
+
+          {/* Financial Charts Panel */}
+          <div className="bg-white rounded-lg p-6 shadow-sm">
+            <h2 className="text-2xl font-semibold mb-4">Financial Charts</h2>
+            {stockData ? (
+              <FinancialCharts
+                incomeData={stockData.financials.incomeStatement}
+                balanceSheet={stockData.financials.balanceSheet}
+                historicalPrices={stockData.historicalPrices}
+                metrics={{
+                  profitMargin: parseFloat(stockData.overview.ProfitMargin || '0'),
+                  peRatio: parseFloat(stockData.overview.PERatio || '0'),
+                  dividendYield: parseFloat(stockData.overview.DividendYield || '0'),
+                  beta: parseFloat(stockData.overview.Beta || '0'),
+                  earningsGrowth: parseFloat(stockData.overview.QuarterlyEarningsGrowthYOY || '0'),
+                  revenueGrowth: parseFloat(stockData.overview.QuarterlyRevenueGrowthYOY || '0')
+                }}
+              />
+            ) : (
+              <p className="text-gray-500">Enter a stock ticker to see the charts</p>
+            )}
+          </div>
+        </div>
       </div>
     </main>
   )

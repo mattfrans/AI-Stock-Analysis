@@ -4,28 +4,56 @@ An intelligent stock analysis tool powered by Claude AI that provides comprehens
 
 ## Features
 
-- Real-time stock analysis using Claude AI
+- Real-time stock analysis using Claude AI (claude-3-opus-20240229)
+- Comprehensive financial data from multiple sources:
+  - Company fundamentals from Alpha Vantage
+  - Real-time and historical prices from Yahoo Finance
+  - AI-powered analysis from Claude
+- Interactive financial charts using Recharts:
+  - Stock Price History
+  - Quarterly Performance
+  - Balance Sheet Overview
+  - Key Performance Metrics
 - Clean, modern UI built with Next.js 14 and Tailwind CSS
-- Comprehensive financial reports including:
-  - Company Overview
-  - Financial Health
-  - Market Position
-  - Risks and Opportunities
-  - Future Outlook
 
 ## Tech Stack
 
 - **Frontend Framework**: Next.js 14
 - **Styling**: Tailwind CSS with shadcn/ui components
-- **AI Integration**: Anthropic's Claude API
+- **AI Integration**: Anthropic's Claude API (claude-3-opus-20240229)
+- **Data Sources**: 
+  - Alpha Vantage API (fundamentals)
+  - Yahoo Finance API (price data)
+- **Charting**: Recharts
 - **Language**: TypeScript
+
+## Data Integration
+
+The app uses multiple data sources to provide comprehensive analysis:
+
+1. **Alpha Vantage API** (requires API key):
+   - Company Overview
+   - Income Statements
+   - Balance Sheets
+   - Rate Limits: 5 calls/minute, 500 calls/day
+
+2. **Yahoo Finance API** (no key required):
+   - Real-time stock prices
+   - Historical price data
+   - Daily time series
+
+3. **Claude AI**:
+   - Analyzes financial data
+   - Provides insights and recommendations
+   - Identifies trends and risks
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+ 
-- Anthropic API Key
+- Anthropic API Key (for Claude AI)
+- Alpha Vantage API Key (for financial data)
 
 ### Installation
 
@@ -40,9 +68,10 @@ cd stock-analysis
 npm install
 ```
 
-3. Create a `.env` file in the root directory and add your Anthropic API key:
+3. Create a `.env` file in the root directory and add your API keys:
 ```env
-ANTHROPIC_API_KEY=your_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here
 ```
 
 4. Run the development server:
@@ -55,8 +84,24 @@ npm run dev
 ## Usage
 
 1. Enter a stock ticker symbol (e.g., "AAPL" for Apple Inc.)
-2. Click "Analyze"
-3. View the comprehensive AI-generated analysis
+2. Click "Analyze" or press Enter
+3. The app will:
+   - Fetch real-time price data from Yahoo Finance
+   - Retrieve fundamental data from Alpha Vantage
+   - Generate AI analysis using Claude
+   - Display interactive charts and insights
+
+## Rate Limits and Caching
+
+- **Alpha Vantage API Limits**:
+  - 5 API calls per minute
+  - 500 API calls per day
+  - Each stock analysis uses 3 calls (overview, income, balance)
+
+- **Yahoo Finance**:
+  - No rate limits
+  - Used for real-time and historical prices
+  - More reliable for price data
 
 ## Contributing
 
