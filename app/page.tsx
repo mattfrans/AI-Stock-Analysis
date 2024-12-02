@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { analyzeStock } from './actions/analyze-stock'
-import { FinancialCharts } from '@/components/charts/FinancialCharts'
+import { FinancialCharts, StockPriceHistory, VolumeChart, MovingAveragesChart, VolatilityChart } from '@/components/charts/FinancialCharts'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export default function Home() {
@@ -111,6 +111,15 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {stockData && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <StockPriceHistory data={stockData} />
+            <MovingAveragesChart data={stockData} />
+            <VolumeChart data={stockData} />
+            <VolatilityChart data={stockData} />
+          </div>
+        )}
       </div>
     </main>
   )

@@ -11,13 +11,26 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-export async function analyzeStock(ticker: string) {
+interface StockData {
+  overview: any;
+  dailyPrice: any;
+  historicalPrices: any;
+  financials: any;
+}
+
+export async function analyzeStock(ticker: string): Promise<string> {
+  // Check if AI analysis is disabled
+  if (process.env.DISABLE_AI_ANALYSIS === 'true') {
+    console.log('AI analysis is disabled for testing');
+    return 'AI analysis is disabled for testing. Enable it by setting DISABLE_AI_ANALYSIS=false in your .env file.';
+  }
+
   if (!ticker) {
     throw new Error('Stock ticker is required');
   }
 
   try {
-    const stockData = await getStockData(ticker.toUpperCase());
+    const stockData: StockData = await getStockData(ticker.toUpperCase());
     
     const {
       overview,

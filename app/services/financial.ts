@@ -7,6 +7,7 @@ export interface StockData {
   dailyPrice: DailyPrice;
   historicalPrices: HistoricalPrice[];
   financials: FinancialData;
+  technicalIndicators: TechnicalIndicators;
 }
 
 interface CompanyOverview {
@@ -79,6 +80,22 @@ interface FinancialData {
       totalShareholderEquity: string;
     }>;
   };
+}
+
+interface YahooFinanceData {
+  date: string;
+  close: number;
+  volume: number;
+  high: number;
+  low: number;
+  open: number;
+}
+
+interface TechnicalIndicators {
+  ma50: (number | null)[];
+  ma200: (number | null)[];
+  dailyReturns: number[];
+  volatility: (number | null)[];
 }
 
 // Rate limiting helper
@@ -173,25 +190,84 @@ async function fetchYahooFinanceData(symbol: string) {
     };
 
     // Get historical prices
-    const historicalPrices: HistoricalPrice[] = timestamps.map((timestamp: number, i: number) => ({
+    const historicalPrices: YahooFinanceData[] = timestamps.map((timestamp: number, i: number) => ({
       date: new Date(timestamp * 1000).toISOString().split('T')[0],
-      open: quotes.open[i],
-      high: quotes.high[i],
-      low: quotes.low[i],
-      close: quotes.close[i],
-      volume: quotes.volume[i]
-    })).filter((price: HistoricalPrice) => 
-      price.open != null && 
-      price.high != null && 
-      price.low != null && 
-      price.close != null
-    );
+      open: quotes.open[i] || 0,
+      high: quotes.high[i] || 0,
+      low: quotes.low[i] || 0,
+      close: quotes.close[i] || 0,
+      volume: quotes.volume[i] || 0
+    }));
 
     return { dailyPrice, historicalPrices };
   } catch (error: any) {
     console.error('Error fetching Yahoo Finance data:', error);
     throw new Error(`Failed to fetch price data: ${error.message}`);
   }
+}
+
+export async function getHistoricalPrices(symbol: string): Promise<YahooFinanceData[]> {
+  const endDate = Math.floor(Date.now() / 1000);
+  const startDate = endDate - (5 * 365 * 24 * 60 * 60); // 5 years ago
+
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${startDate}&period2=${endDate}&interval=1d`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch historical prices: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const timestamps = data.chart.result[0].timestamp;
+    const quotes = data.chart.result[0].indicators.quote[0];
+    
+    return timestamps.map((timestamp: number, index: number) => ({
+      date: new Date(timestamp * 1000).toISOString().split('T')[0],
+      close: quotes.close[index] || 0,
+      volume: quotes.volume[index] || 0,
+      high: quotes.high[index] || 0,
+      low: quotes.low[index] || 0,
+      open: quotes.open[index] || 0
+    }));
+  } catch (error) {
+    console.error('Error fetching historical prices:', error);
+    return [];
+  }
+}
+
+// Calculate technical indicators
+export function calculateTechnicalIndicators(prices: YahooFinanceData[]) {
+  // Calculate 50-day and 200-day moving averages
+  const calculateMA = (period: number) => {
+    return prices.map((_, index) => {
+      if (index < period - 1) return null;
+      const sum = prices.slice(index - period + 1, index + 1).reduce((acc, curr) => acc + curr.close, 0);
+      return sum / period;
+    });
+  };
+
+  // Calculate daily returns
+  const dailyReturns = prices.map((price, index) => {
+    if (index === 0) return 0;
+    return ((price.close - prices[index - 1].close) / prices[index - 1].close) * 100;
+  });
+
+  // Calculate volatility (20-day rolling standard deviation of returns)
+  const volatility = dailyReturns.map((_, index) => {
+    if (index < 20) return null;
+    const periodReturns = dailyReturns.slice(index - 20, index);
+    const mean = periodReturns.reduce((acc, curr) => acc + curr, 0) / 20;
+    const squaredDiffs = periodReturns.map(r => Math.pow(r - mean, 2));
+    return Math.sqrt(squaredDiffs.reduce((acc, curr) => acc + curr, 0) / 20);
+  });
+
+  return {
+    ma50: calculateMA(50),
+    ma200: calculateMA(200),
+    dailyReturns,
+    volatility
+  };
 }
 
 export async function getStockData(symbol: string): Promise<StockData> {
@@ -242,16 +318,24 @@ export async function getStockData(symbol: string): Promise<StockData> {
       throw new Error('Failed to fetch balance sheet data');
     }
 
+    // Fetch 5-year historical prices
+    console.log('Fetching 5-year historical prices...');
+    const fiveYearHistoricalPrices = await getHistoricalPrices(symbol);
+
+    // Calculate technical indicators
+    const technicalIndicators = calculateTechnicalIndicators(fiveYearHistoricalPrices);
+
     console.log('Successfully fetched all data for:', symbol);
 
     return {
       overview,
       dailyPrice,
-      historicalPrices,
+      historicalPrices: fiveYearHistoricalPrices,
       financials: {
         incomeStatement,
         balanceSheet
-      }
+      },
+      technicalIndicators
     };
   } catch (error: any) {
     console.error('Error in getStockData:', {
