@@ -60,7 +60,7 @@ interface StockData {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
-export function FinancialCharts({ incomeData, balanceSheet, historicalPrices, metrics }: FinancialChartsProps) {
+function FinancialCharts({ incomeData, balanceSheet, historicalPrices, metrics }: FinancialChartsProps) {
   // Format quarterly income data
   const quarterlyData = incomeData.quarterlyReports.slice(0, 8).map(report => ({
     quarter: report.fiscalDateEnding.slice(0, 7),
@@ -226,7 +226,7 @@ export function FinancialCharts({ incomeData, balanceSheet, historicalPrices, me
   );
 }
 
-export function VolumeChart({ data }: { data: StockData }) {
+function VolumeChart({ data }: { data: StockData }) {
   const weeklyPrices = data.historicalPrices.filter((_, index) => index % 5 === 0);
   const isStartOfYear = (date: string) => {
     const d = new Date(date);
@@ -266,7 +266,7 @@ export function VolumeChart({ data }: { data: StockData }) {
   );
 }
 
-export function MovingAveragesChart({ data }: { data: StockData }) {
+function MovingAveragesChart({ data }: { data: StockData }) {
   const weeklyPrices = data.historicalPrices.filter((_, index) => index % 5 === 0);
   const ma50 = data.technicalIndicators.ma50.filter((_, index) => index % 5 === 0);
   const ma200 = data.technicalIndicators.ma200.filter((_, index) => index % 5 === 0);
@@ -316,7 +316,7 @@ export function MovingAveragesChart({ data }: { data: StockData }) {
   );
 }
 
-export function VolatilityChart({ data }: { data: StockData }) {
+function VolatilityChart({ data }: { data: StockData }) {
   const weeklyData = data.technicalIndicators.volatility.filter((_, index) => index % 5 === 0);
   const weeklyDates = data.historicalPrices.filter((_, index) => index % 5 === 0).map(p => p.date);
   
@@ -365,3 +365,50 @@ export function VolatilityChart({ data }: { data: StockData }) {
     </div>
   );
 }
+
+function StockPriceHistory({ data }: { data: StockData }) {
+  return (
+    <div className="bg-white rounded-lg p-6 shadow-sm">
+      <h3 className="text-lg font-semibold mb-4">Stock Price History</h3>
+      <div className="h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={data.historicalPrices}
+            margin={{
+              top: 5,
+              right: 30,
+              left: 20,
+              bottom: 5,
+            }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="date"
+              tick={{ fontSize: 12 }}
+              tickFormatter={(value) => value.split('-')[0]}
+            />
+            <YAxis 
+              tick={{ fontSize: 12 }}
+              domain={['auto', 'auto']}
+              tickFormatter={(value) => `$${value}`}
+            />
+            <Tooltip 
+              formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
+              labelFormatter={(label) => `Date: ${label}`}
+            />
+            <Legend />
+            <Line
+              type="monotone"
+              dataKey="close"
+              stroke="#8884d8"
+              dot={false}
+              name="Closing Price"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+export { FinancialCharts, VolumeChart, MovingAveragesChart, VolatilityChart, StockPriceHistory };
