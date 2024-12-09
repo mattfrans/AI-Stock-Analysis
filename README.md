@@ -14,6 +14,7 @@ An intelligent stock analysis tool powered by Claude AI that provides comprehens
   - Quarterly Performance
   - Balance Sheet Overview
   - Key Performance Metrics
+- Stock forecast using Prophet
 - Clean, modern UI built with Next.js 14 and Tailwind CSS
 
 ## Tech Stack

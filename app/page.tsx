@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { analyzeStock } from './actions/analyze-stock'
 import { FinancialCharts, StockPriceHistory, VolumeChart, MovingAveragesChart, VolatilityChart } from '@/components/charts/FinancialCharts'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { StockForecast } from '@/components/StockForecast'
 
 export default function Home() {
   const [ticker, setTicker] = useState('')
@@ -72,45 +74,64 @@ export default function Home() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* AI Analysis Panel */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-2xl font-semibold mb-4">AI Analysis</h2>
-            {loading ? (
-              <p>Analyzing stock data...</p>
-            ) : analysis ? (
-              <div className="prose max-w-none">
-                {analysis.split('\n').map((paragraph, index) => (
-                  <p key={index}>{paragraph}</p>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500">Enter a stock ticker to see the analysis</p>
-            )}
-          </div>
+        {ticker && (
+          <Tabs defaultValue="analysis" className="mb-8">
+            <TabsList>
+              <TabsTrigger value="analysis">Analysis</TabsTrigger>
+              <TabsTrigger value="charts">Charts</TabsTrigger>
+              <TabsTrigger value="forecast">Forecast</TabsTrigger>
+            </TabsList>
 
-          {/* Financial Charts Panel */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-2xl font-semibold mb-4">Financial Charts</h2>
-            {stockData ? (
-              <FinancialCharts
-                incomeData={stockData.financials.incomeStatement}
-                balanceSheet={stockData.financials.balanceSheet}
-                historicalPrices={stockData.historicalPrices}
-                metrics={{
-                  profitMargin: parseFloat(stockData.overview.ProfitMargin || '0'),
-                  peRatio: parseFloat(stockData.overview.PERatio || '0'),
-                  dividendYield: parseFloat(stockData.overview.DividendYield || '0'),
-                  beta: parseFloat(stockData.overview.Beta || '0'),
-                  earningsGrowth: parseFloat(stockData.overview.QuarterlyEarningsGrowthYOY || '0'),
-                  revenueGrowth: parseFloat(stockData.overview.QuarterlyRevenueGrowthYOY || '0')
-                }}
-              />
-            ) : (
-              <p className="text-gray-500">Enter a stock ticker to see the charts</p>
-            )}
-          </div>
-        </div>
+            <TabsContent value="analysis">
+              <div className="bg-white rounded-lg p-6 shadow-sm">
+                <h2 className="text-2xl font-semibold mb-4">AI Analysis</h2>
+                {loading ? (
+                  <p>Analyzing stock data...</p>
+                ) : analysis ? (
+                  <div className="prose max-w-none">
+                    {analysis.split('\n').map((paragraph, index) => (
+                      <p key={index}>{paragraph}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500">Enter a stock ticker to see the analysis</p>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="charts">
+              <div className="bg-white rounded-lg p-6 shadow-sm">
+                <h2 className="text-2xl font-semibold mb-4">Financial Charts</h2>
+                {stockData ? (
+                  <FinancialCharts
+                    incomeData={stockData.financials.incomeStatement}
+                    balanceSheet={stockData.financials.balanceSheet}
+                    historicalPrices={stockData.historicalPrices}
+                    metrics={{
+                      profitMargin: parseFloat(stockData.overview.ProfitMargin || '0'),
+                      operatingMargin: parseFloat(stockData.overview.OperatingMarginTTM || '0'),
+                      returnOnAssets: parseFloat(stockData.overview.ReturnOnAssetsTTM || '0'),
+                      returnOnEquity: parseFloat(stockData.overview.ReturnOnEquityTTM || '0'),
+                    }}
+                  />
+                ) : (
+                  <p className="text-gray-500">Enter a stock ticker to see the charts</p>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="forecast">
+              <div className="bg-white rounded-lg p-6 shadow-sm">
+                <h2 className="text-2xl font-semibold mb-4">Price Forecast</h2>
+                {ticker ? (
+                  <StockForecast ticker={ticker} />
+                ) : (
+                  <p className="text-gray-500">Enter a stock ticker to see the forecast</p>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
 
         {stockData && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
