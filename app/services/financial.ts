@@ -1,5 +1,12 @@
 import { StockData, CompanyOverview, DailyPrice, HistoricalPrice, FinancialData, TechnicalIndicators, YahooFinanceData } from '../types';
 
+// Debug logging
+console.log('Financial Service Initialization:', {
+  ALPHA_VANTAGE_API_KEY: process.env.ALPHA_VANTAGE_API_KEY ? 'Set' : 'Not Set',
+  NODE_ENV: process.env.NODE_ENV,
+  VERCEL_ENV: process.env.VERCEL_ENV
+});
+
 const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 const ALPHA_VANTAGE_URL = 'https://www.alphavantage.co/query';
 const YAHOO_FINANCE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
@@ -26,37 +33,31 @@ async function rateLimitedFetch(url: string) {
     const response = await fetch(url);
     
     if (!response.ok) {
+      console.error('API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: sanitizedUrl
+      });
       throw new Error(`API call failed: ${response.statusText} (${response.status})`);
     }
 
     const data = await response.json();
-    console.log('Response data:', JSON.stringify(data, null, 2));
     
-    // Check for API-specific error messages
+    // Check for Alpha Vantage error messages
     if (data['Error Message']) {
       console.error('Alpha Vantage Error:', data['Error Message']);
-      throw new Error(`Alpha Vantage Error: ${data['Error Message']}`);
+      throw new Error(data['Error Message']);
     }
     
-    if (data['Note']) {
-      console.error('Alpha Vantage Rate Limit:', data['Note']);
-      throw new Error('API rate limit exceeded. Please try again later.');
-    }
-    
-    // Check for empty responses
-    if (Object.keys(data).length === 0) {
-      console.error('Empty response from API');
-      throw new Error('No data received from API');
+    // Check for rate limit messages
+    if (data.Note && data.Note.includes('API call frequency')) {
+      console.error('Rate Limit Hit:', data.Note);
+      throw new Error('API rate limit exceeded. Please try again in a minute.');
     }
 
-    // Log successful response
-    console.log('Received data for:', sanitizedUrl);
     return data;
-  } catch (error: any) {
-    console.error('API call failed:', {
-      url: sanitizedUrl,
-      error: error.message
-    });
+  } catch (error) {
+    console.error('Fetch Error:', error);
     throw error;
   }
 }
@@ -70,11 +71,17 @@ async function fetchYahooFinanceData(symbol: string) {
   try {
     const response = await fetch(url);
     if (!response.ok) {
+      console.error('Yahoo Finance API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        url
+      });
       throw new Error(`Yahoo Finance API call failed: ${response.statusText}`);
     }
     
     const data = await response.json();
     if (!data.chart?.result?.[0]) {
+      console.error('No price data available:', data);
       throw new Error('No price data available');
     }
     
@@ -106,9 +113,9 @@ async function fetchYahooFinanceData(symbol: string) {
     }));
 
     return { dailyPrice, historicalPrices };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching Yahoo Finance data:', error);
-    throw new Error(`Failed to fetch price data: ${error.message}`);
+    throw error;
   }
 }
 
@@ -121,6 +128,11 @@ export async function getHistoricalPrices(symbol: string): Promise<YahooFinanceD
   try {
     const response = await fetch(url);
     if (!response.ok) {
+      console.error('Historical Prices API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        url
+      });
       throw new Error(`Failed to fetch historical prices: ${response.statusText}`);
     }
     
@@ -243,7 +255,7 @@ export async function getStockData(symbol: string): Promise<StockData> {
       },
       technicalIndicators
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in getStockData:', {
       symbol,
       error: error.message,

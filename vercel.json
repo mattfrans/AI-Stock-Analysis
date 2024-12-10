@@ -4,6 +4,10 @@
     {
       "src": "next.config.js",
       "use": "@vercel/next"
+    },
+    {
+      "src": "scripts/**/*.py",
+      "use": "@vercel/python"
     }
   ],
   "git": {
