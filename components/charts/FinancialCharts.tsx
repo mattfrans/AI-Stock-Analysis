@@ -23,8 +23,22 @@ interface FinancialMetric {
 }
 
 interface FinancialChartsProps {
-  incomeData: any;
-  balanceSheet: any;
+  incomeData: {
+    quarterlyReports: Array<{
+      fiscalDateEnding: string;
+      totalRevenue: string;
+      netIncome: string;
+      operatingIncome: string;
+    }>;
+  };
+  balanceSheet: {
+    quarterlyReports: Array<{
+      fiscalDateEnding: string;
+      totalAssets: string;
+      totalLiabilities: string;
+      totalShareholderEquity: string;
+    }>;
+  };
   historicalPrices: Array<{
     date: string;
     open: number;
