@@ -12,10 +12,44 @@ const anthropic = new Anthropic({
 });
 
 interface StockData {
-  overview: any;
-  dailyPrice: any;
-  historicalPrices: any;
-  financials: any;
+  overview: {
+    Name: string;
+    Sector: string;
+    Industry: string;
+    MarketCapitalization: string;
+    PERatio: string;
+    Beta: string;
+    ProfitMargin: string;
+    DividendYield: string;
+    QuarterlyEarningsGrowthYOY: string;
+    QuarterlyRevenueGrowthYOY: string;
+  };
+  dailyPrice: {
+    close: number;
+    change: number;
+    changePercent: number;
+  };
+  historicalPrices: Array<{
+    close: number;
+    date: string;
+  }>;
+  financials: {
+    incomeStatement: {
+      quarterlyReports: Array<{
+        fiscalDateEnding: string;
+        totalRevenue: string;
+        netIncome: string;
+        operatingIncome: string;
+      }>;
+    };
+    balanceSheet: {
+      quarterlyReports: Array<{
+        totalCurrentAssets: string;
+        totalLiabilities: string;
+        totalShareholderEquity: string;
+      }>;
+    };
+  };
 }
 
 export async function analyzeStock(ticker: string): Promise<string> {
@@ -60,8 +94,8 @@ export async function analyzeStock(ticker: string): Promise<string> {
     const priceChange = dailyPrice.change;
     const priceChangePercent = dailyPrice.changePercent;
     const recentPrices = historicalPrices.slice(-30); // Last 30 days
-    const avgPrice = recentPrices.reduce((sum, price) => sum + price.close, 0) / recentPrices.length;
-    const priceVolatility = Math.sqrt(recentPrices.reduce((sum, price) => sum + Math.pow(price.close - avgPrice, 2), 0) / recentPrices.length);
+    const avgPrice = recentPrices.reduce((sum: number, price: any) => sum + price.close, 0) / recentPrices.length;
+    const priceVolatility = Math.sqrt(recentPrices.reduce((sum: number, price: any) => sum + Math.pow(price.close - avgPrice, 2), 0) / recentPrices.length);
 
     const prompt = `You are a professional stock analyst. Analyze the following financial data for ${ticker} (${overview.Name}) and provide a comprehensive but concise analysis. Focus on key insights, trends, and potential risks/opportunities.
 
