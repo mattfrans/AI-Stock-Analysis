@@ -15,6 +15,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import { StockData } from '@/app/types';
 
 interface FinancialMetric {
   name: string;
@@ -39,22 +40,6 @@ interface FinancialChartsProps {
     beta: number;
     earningsGrowth: number;
     revenueGrowth: number;
-  };
-}
-
-interface StockData {
-  historicalPrices: Array<{
-    date: string;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume: number;
-  }>;
-  technicalIndicators: {
-    ma50: Array<number>;
-    ma200: Array<number>;
-    volatility: Array<number>;
   };
 }
 

@@ -2,6 +2,7 @@
 
 import { Anthropic } from '@anthropic-ai/sdk';
 import { getStockData, formatNumber, formatPercentage } from '../services/financial';
+import { StockData } from '../types';
 
 if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error('ANTHROPIC_API_KEY is not set in environment variables');
@@ -10,57 +11,6 @@ if (!process.env.ANTHROPIC_API_KEY) {
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-interface StockData {
-  overview: {
-    Name: string;
-    Sector: string;
-    Industry: string;
-    MarketCapitalization: string;
-    PERatio: string;
-    Beta: string;
-    ProfitMargin: string;
-    DividendYield: string;
-    QuarterlyEarningsGrowthYOY: string;
-    QuarterlyRevenueGrowthYOY: string;
-  };
-  dailyPrice: {
-    close: string;
-    change: string;
-    changePercent: number;
-  };
-  historicalPrices: Array<{
-    date: string;
-    close: number;
-    open: number;
-    high: number;
-    low: number;
-    volume: number;
-  }>;
-  financials: {
-    incomeStatement: {
-      quarterlyReports: Array<{
-        fiscalDateEnding: string;
-        totalRevenue: string;
-        netIncome: string;
-        operatingIncome: string;
-      }>;
-    };
-    balanceSheet: {
-      quarterlyReports: Array<{
-        totalCurrentAssets: string;
-        totalLiabilities: string;
-        totalShareholderEquity: string;
-      }>;
-    };
-  };
-  technicalIndicators: {
-    ma50: (number | null)[];
-    ma200: (number | null)[];
-    dailyReturns: number[];
-    volatility: (number | null)[];
-  };
-}
 
 export async function analyzeStock(ticker: string): Promise<string> {
   // Check if AI analysis is disabled
