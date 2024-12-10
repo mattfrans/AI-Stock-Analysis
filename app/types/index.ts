@@ -60,6 +60,15 @@ export interface TechnicalIndicators {
   volatility: (number | null)[];
 }
 
+export interface YahooFinanceData {
+  date: string;
+  close: number;
+  volume: number;
+  high: number;
+  low: number;
+  open: number;
+}
+
 export interface StockData {
   overview: CompanyOverview;
   dailyPrice: DailyPrice;
