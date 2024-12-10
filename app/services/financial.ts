@@ -185,7 +185,7 @@ async function fetchYahooFinanceData(symbol: string) {
       low: quotes.low[lastIndex].toString(),
       close: quotes.close[lastIndex].toString(),
       volume: quotes.volume[lastIndex].toString(),
-      change: quotes.close[lastIndex] - quotes.close[lastIndex - 1],
+      change: (quotes.close[lastIndex] - quotes.close[lastIndex - 1]).toString(),
       changePercent: ((quotes.close[lastIndex] - quotes.close[lastIndex - 1]) / quotes.close[lastIndex - 1]) * 100
     };
 
