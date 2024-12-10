@@ -25,13 +25,17 @@ interface StockData {
     QuarterlyRevenueGrowthYOY: string;
   };
   dailyPrice: {
-    close: number;
-    change: number;
+    close: string;
+    change: string;
     changePercent: number;
   };
   historicalPrices: Array<{
-    close: number;
     date: string;
+    close: number;
+    open: number;
+    high: number;
+    low: number;
+    volume: number;
   }>;
   financials: {
     incomeStatement: {
@@ -49,6 +53,12 @@ interface StockData {
         totalShareholderEquity: string;
       }>;
     };
+  };
+  technicalIndicators: {
+    ma50: (number | null)[];
+    ma200: (number | null)[];
+    dailyReturns: number[];
+    volatility: (number | null)[];
   };
 }
 
@@ -108,7 +118,7 @@ Company Overview:
 
 Recent Stock Performance:
 - Current Price: $${dailyPrice.close}
-- Daily Change: ${priceChange > 0 ? '+' : ''}${formatNumber(priceChange)} (${priceChangePercent.toFixed(2)}%)
+- Daily Change: ${parseFloat(priceChange) > 0 ? '+' : ''}${formatNumber(priceChange)} (${priceChangePercent.toFixed(2)}%)
 - 30-Day Price Volatility: ${priceVolatility.toFixed(2)}
 - Average 30-Day Price: $${avgPrice.toFixed(2)}
 
