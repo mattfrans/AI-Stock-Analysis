@@ -34,7 +34,7 @@ interface DailyPrice {
   low: string;
   close: string;
   volume: string;
-  change: number;
+  change: string;
   changePercent: number;
 }
 
