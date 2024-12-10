@@ -35,11 +35,9 @@ interface FinancialChartsProps {
   }>;
   metrics: {
     profitMargin: number;
-    peRatio: number;
-    dividendYield: number;
-    beta: number;
-    earningsGrowth: number;
-    revenueGrowth: number;
+    operatingMargin: number;
+    returnOnAssets: number;
+    returnOnEquity: number;
   };
 }
 
@@ -83,11 +81,9 @@ function FinancialCharts({ incomeData, balanceSheet, historicalPrices, metrics }
   // Key performance metrics
   const performanceMetrics = [
     { name: 'Profit Margin', value: metrics.profitMargin },
-    { name: 'P/E Ratio', value: metrics.peRatio },
-    { name: 'Dividend Yield', value: metrics.dividendYield },
-    { name: 'Beta', value: metrics.beta },
-    { name: 'Earnings Growth', value: metrics.earningsGrowth },
-    { name: 'Revenue Growth', value: metrics.revenueGrowth }
+    { name: 'Operating Margin', value: metrics.operatingMargin },
+    { name: 'Return on Assets', value: metrics.returnOnAssets },
+    { name: 'Return on Equity', value: metrics.returnOnEquity }
   ];
 
   const formatLargeNumber = (value: number) => {
