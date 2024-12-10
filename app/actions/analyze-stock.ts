@@ -116,7 +116,7 @@ Keep the analysis professional but easy to understand. Highlight the most import
       });
 
       return response.content[0].text;
-    } catch (aiError) {
+    } catch (aiError: any) {
       console.error('Error calling Claude API:', aiError);
       throw new Error(`AI Analysis failed: ${aiError.message}`);
     }
