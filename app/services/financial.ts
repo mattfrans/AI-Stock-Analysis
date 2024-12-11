@@ -255,11 +255,14 @@ export async function getStockData(symbol: string): Promise<StockData> {
       },
       technicalIndicators
     };
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
     console.error('Error in getStockData:', {
       symbol,
-      error: error.message,
-      stack: error.stack
+      error: errorMessage,
+      stack: errorStack
     });
     throw error;
   }
