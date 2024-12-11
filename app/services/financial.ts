@@ -80,17 +80,29 @@ async function fetchYahooFinanceData(symbol: string) {
     }
     
     const data = await response.json();
-    if (!data.chart?.result?.[0]) {
-      console.error('No price data available:', data);
-      throw new Error('No price data available');
+    
+    // Validate the response structure
+    if (!data?.chart?.result?.[0]?.indicators?.quote?.[0]) {
+      console.error('Invalid Yahoo Finance data structure:', data);
+      throw new Error('Invalid data received from Yahoo Finance');
     }
     
     const result = data.chart.result[0];
     const quotes = result.indicators.quote[0];
     const timestamps = result.timestamp;
     
+    // Validate required data points
+    if (!quotes.close || !quotes.open || !quotes.high || !quotes.low || !quotes.volume) {
+      console.error('Missing required price data:', quotes);
+      throw new Error('Incomplete price data received from Yahoo Finance');
+    }
+    
     // Get current price data
     const lastIndex = quotes.close.length - 1;
+    if (lastIndex < 0) {
+      throw new Error('No price data available');
+    }
+    
     const dailyPrice: DailyPrice = {
       date: new Date(timestamps[lastIndex] * 1000).toISOString().split('T')[0],
       open: quotes.open[lastIndex].toString(),
@@ -99,7 +111,7 @@ async function fetchYahooFinanceData(symbol: string) {
       close: quotes.close[lastIndex].toString(),
       volume: quotes.volume[lastIndex].toString(),
       change: (quotes.close[lastIndex] - quotes.close[lastIndex - 1]).toString(),
-      changePercent: ((quotes.close[lastIndex] - quotes.close[lastIndex - 1]) / quotes.close[lastIndex - 1]) * 100
+      changePercent: ((quotes.close[lastIndex] - quotes.close[lastIndex - 1]) / quotes.close[lastIndex - 1] * 100)
     };
 
     // Get historical prices
@@ -115,7 +127,10 @@ async function fetchYahooFinanceData(symbol: string) {
     return { dailyPrice, historicalPrices };
   } catch (error) {
     console.error('Error fetching Yahoo Finance data:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to fetch stock data from Yahoo Finance');
   }
 }
 
