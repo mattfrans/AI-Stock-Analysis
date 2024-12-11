@@ -30,11 +30,12 @@ export default function Home() {
     try {
       // First fetch the stock data
       const response = await fetch(`/api/stock/${ticker.toUpperCase()}`)
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to fetch stock data')
-      }
       const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch stock data')
+      }
+      
       setStockData(data)
 
       // Then get the AI analysis
