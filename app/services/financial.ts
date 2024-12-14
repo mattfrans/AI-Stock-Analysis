@@ -11,55 +11,109 @@ const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 const ALPHA_VANTAGE_URL = 'https://www.alphavantage.co/query';
 const YAHOO_FINANCE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
-// Rate limiting helper
-let lastCallTime = 0;
-const RATE_LIMIT_DELAY = 12000; // 12 seconds to be safe (5 calls per minute)
+// Rate limiting with request queue
+class RateLimiter {
+  private queue: Array<() => Promise<any>> = [];
+  private processing = false;
+  private lastCallTime = 0;
+  private readonly RATE_LIMIT_DELAY = 12000; // 12 seconds to be safe (5 calls per minute)
+  private readonly MAX_RETRIES = 3;
+
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await this.executeWithRetry(fn);
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      
+      if (!this.processing) {
+        this.processQueue();
+      }
+    });
+  }
+
+  private async executeWithRetry<T>(fn: () => Promise<T>, retries = 0): Promise<T> {
+    try {
+      const now = Date.now();
+      const timeSinceLastCall = now - this.lastCallTime;
+      
+      if (timeSinceLastCall < this.RATE_LIMIT_DELAY) {
+        const waitTime = this.RATE_LIMIT_DELAY - timeSinceLastCall;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+      
+      this.lastCallTime = Date.now();
+      return await fn();
+    } catch (error) {
+      if (retries < this.MAX_RETRIES && error instanceof Error && error.message.includes('rate limit')) {
+        await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
+        return this.executeWithRetry(fn, retries + 1);
+      }
+      throw error;
+    }
+  }
+
+  private async processQueue() {
+    if (this.processing || this.queue.length === 0) {
+      return;
+    }
+    
+    this.processing = true;
+    
+    while (this.queue.length > 0) {
+      const task = this.queue.shift();
+      if (task) {
+        await task();
+      }
+    }
+    
+    this.processing = false;
+  }
+}
+
+const rateLimiter = new RateLimiter();
 
 async function rateLimitedFetch(url: string) {
-  const now = Date.now();
-  const timeSinceLastCall = now - lastCallTime;
-  
-  if (timeSinceLastCall < RATE_LIMIT_DELAY) {
-    const waitTime = RATE_LIMIT_DELAY - timeSinceLastCall;
-    console.log(`Rate limiting: waiting ${waitTime}ms before next call`);
-    await new Promise(resolve => setTimeout(resolve, waitTime));
-  }
-  
-  lastCallTime = Date.now();
-  const sanitizedUrl = url.replace(ALPHA_VANTAGE_API_KEY || '', '[API_KEY]');
-  console.log('Fetching:', sanitizedUrl);
-  
-  try {
-    const response = await fetch(url);
+  return rateLimiter.execute(async () => {
+    const sanitizedUrl = url.replace(ALPHA_VANTAGE_API_KEY || '', '[API_KEY]');
+    console.log('Fetching:', sanitizedUrl);
     
-    if (!response.ok) {
-      console.error('API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        url: sanitizedUrl
-      });
-      throw new Error(`API call failed: ${response.statusText} (${response.status})`);
-    }
+    try {
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.error('API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: sanitizedUrl
+        });
+        throw new Error(`API call failed: ${response.statusText} (${response.status})`);
+      }
 
-    const data = await response.json();
-    
-    // Check for Alpha Vantage error messages
-    if (data['Error Message']) {
-      console.error('Alpha Vantage Error:', data['Error Message']);
-      throw new Error(data['Error Message']);
-    }
-    
-    // Check for rate limit messages
-    if (data.Note && data.Note.includes('API call frequency')) {
-      console.error('Rate Limit Hit:', data.Note);
-      throw new Error('API rate limit exceeded. Please try again in a minute.');
-    }
+      const data = await response.json();
+      
+      // Check for Alpha Vantage error messages
+      if (data['Error Message']) {
+        console.error('Alpha Vantage Error:', data['Error Message']);
+        throw new Error(data['Error Message']);
+      }
+      
+      // Check for rate limit messages
+      if (data.Note && data.Note.includes('API call frequency')) {
+        console.error('Rate Limit Hit:', data.Note);
+        throw new Error('API rate limit exceeded');
+      }
 
-    return data;
-  } catch (error) {
-    console.error('Fetch Error:', error);
-    throw error;
-  }
+      return data;
+    } catch (error) {
+      console.error('Fetch Error:', error);
+      throw error;
+    }
+  });
 }
 
 // Yahoo Finance API call (no rate limiting needed)
@@ -131,6 +185,59 @@ async function fetchYahooFinanceData(symbol: string) {
       throw error;
     }
     throw new Error('Failed to fetch stock data from Yahoo Finance');
+  }
+}
+
+export interface FinancialData {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  previousClose: number;
+  open: number;
+  dayHigh: number;
+  dayLow: number;
+  volume: number;
+  marketCap?: number;
+}
+
+export async function getFinancialData(symbol: string): Promise<FinancialData> {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch financial data');
+    }
+
+    const data = await response.json();
+    
+    if (!data.chart?.result?.[0]) {
+      throw new Error('Invalid data format received');
+    }
+
+    const result = data.chart.result[0];
+    const quote = result.indicators.quote[0];
+    const meta = result.meta;
+    const timestamp = result.timestamp[result.timestamp.length - 1];
+    const currentPrice = meta.regularMarketPrice;
+    const previousClose = meta.previousClose;
+
+    return {
+      symbol: symbol,
+      price: currentPrice,
+      change: currentPrice - previousClose,
+      changePercent: ((currentPrice - previousClose) / previousClose) * 100,
+      previousClose: previousClose,
+      open: meta.regularMarketOpen,
+      dayHigh: meta.regularMarketDayHigh,
+      dayLow: meta.regularMarketDayLow,
+      volume: meta.regularMarketVolume,
+      marketCap: meta.marketCap
+    };
+  } catch (error) {
+    console.error('Error fetching financial data:', error);
+    throw error;
   }
 }
 

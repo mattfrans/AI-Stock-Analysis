@@ -35,6 +35,13 @@ export interface HistoricalPrice {
   volume: number;
 }
 
+export interface FinancialMetrics {
+  profitMargin: number;
+  operatingMargin: number;
+  returnOnAssets: number;
+  returnOnEquity: number;
+}
+
 export interface FinancialData {
   incomeStatement: {
     quarterlyReports: Array<{
@@ -74,5 +81,6 @@ export interface StockData {
   dailyPrice: DailyPrice;
   historicalPrices: HistoricalPrice[];
   financials: FinancialData;
-  technicalIndicators: TechnicalIndicators;
+  metrics: FinancialMetrics;
+  technicalIndicators?: TechnicalIndicators;
 }
