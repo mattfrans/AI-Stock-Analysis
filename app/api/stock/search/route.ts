@@ -32,7 +32,6 @@ export async function GET(request: Request) {
       throw new Error('Alpha Vantage API key is not configured');
     }
 
-    // Use Alpha Vantage's Symbol Search endpoint
     const searchUrl = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
     console.log('Fetching data from Alpha Vantage');
     
@@ -42,7 +41,6 @@ export async function GET(request: Request) {
     }
 
     const data = await response.json();
-    
     if (data.Note) {
       console.warn('Alpha Vantage API limit warning:', data.Note);
       return NextResponse.json({ error: 'API rate limit reached. Please try again later.' }, { status: 429 });
@@ -64,9 +62,7 @@ export async function GET(request: Request) {
       }))
     };
 
-    // Cache the successful response
     stockCache.set(symbol, { data: result, timestamp: now });
-
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error searching stock symbol:', error);

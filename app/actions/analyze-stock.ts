@@ -28,15 +28,20 @@ export async function analyzeStock(ticker: string): Promise<string> {
     
     const {
       overview,
-      dailyPrice,
       historicalPrices,
-      financials: { incomeStatement, balanceSheet }
+      financials
     } = stockData;
 
+    if (!financials || !financials.incomeStatement || !financials.balanceSheet) {
+      throw new Error('Financial data not available');
+    }
+
+    const { incomeStatement, balanceSheet } = financials;
+
     // Format the most recent quarterly data
-    const latestQuarter = incomeStatement.quarterlyReports[0];
-    const previousQuarter = incomeStatement.quarterlyReports[1];
-    const yearAgoQuarter = incomeStatement.quarterlyReports[3];
+    const latestQuarter = incomeStatement.quarterlyReports[0] || { totalRevenue: '0', netIncome: '0' };
+    const previousQuarter = incomeStatement.quarterlyReports[1] || { totalRevenue: '0', netIncome: '0' };
+    const yearAgoQuarter = incomeStatement.quarterlyReports[3] || { totalRevenue: '0', netIncome: '0' };
 
     // Calculate quarter-over-quarter and year-over-year growth
     const qoqRevenueGrowth = ((parseFloat(latestQuarter.totalRevenue) - parseFloat(previousQuarter.totalRevenue)) / parseFloat(previousQuarter.totalRevenue)) * 100;
@@ -46,83 +51,73 @@ export async function analyzeStock(ticker: string): Promise<string> {
     const yoyIncomeGrowth = ((parseFloat(latestQuarter.netIncome) - parseFloat(yearAgoQuarter.netIncome)) / parseFloat(yearAgoQuarter.netIncome)) * 100;
 
     // Calculate key financial ratios
-    const latestBalanceSheet = balanceSheet.quarterlyReports[0];
-    const currentRatio = parseFloat(latestBalanceSheet.totalCurrentAssets) / parseFloat(latestBalanceSheet.totalLiabilities);
-    const debtToEquity = parseFloat(latestBalanceSheet.totalLiabilities) / parseFloat(latestBalanceSheet.totalShareholderEquity);
+    const latestBalanceSheet = balanceSheet.quarterlyReports[0] || {
+      totalCurrentAssets: '0',
+      totalLiabilities: '0',
+      totalShareholderEquity: '0'
+    };
+
+    const currentRatio = latestBalanceSheet.totalCurrentAssets && latestBalanceSheet.totalLiabilities
+      ? parseFloat(latestBalanceSheet.totalCurrentAssets) / parseFloat(latestBalanceSheet.totalLiabilities)
+      : 0;
+
+    const debtToEquity = latestBalanceSheet.totalLiabilities && latestBalanceSheet.totalShareholderEquity
+      ? parseFloat(latestBalanceSheet.totalLiabilities) / parseFloat(latestBalanceSheet.totalShareholderEquity)
+      : 0;
 
     // Format stock price performance
-    const priceChange = dailyPrice.change;
-    const priceChangePercent = dailyPrice.changePercent;
     const recentPrices = historicalPrices.slice(-30); // Last 30 days
     const avgPrice = recentPrices.reduce((sum: number, price: any) => sum + price.close, 0) / recentPrices.length;
     const priceVolatility = Math.sqrt(recentPrices.reduce((sum: number, price: any) => sum + Math.pow(price.close - avgPrice, 2), 0) / recentPrices.length);
 
-    const prompt = `You are a professional stock analyst. Analyze the following financial data for ${ticker} (${overview.Name}) and provide a comprehensive but concise analysis. Focus on key insights, trends, and potential risks/opportunities.
+    // Generate the analysis using Claude
+    const prompt = `Analyze the following financial data for ${ticker}:
 
-Company Overview:
-- Sector: ${overview.Sector}
-- Industry: ${overview.Industry}
-- Market Cap: ${formatNumber(overview.MarketCapitalization)}
+Key Metrics:
+- Market Cap: ${overview.MarketCapitalization}
 - P/E Ratio: ${overview.PERatio}
 - Beta: ${overview.Beta}
 
 Recent Stock Performance:
-- Current Price: $${dailyPrice.close}
-- Daily Change: ${parseFloat(priceChange) > 0 ? '+' : ''}${formatNumber(priceChange)} (${priceChangePercent.toFixed(2)}%)
+- Current Price: $${avgPrice.toFixed(2)}
 - 30-Day Price Volatility: ${priceVolatility.toFixed(2)}
 - Average 30-Day Price: $${avgPrice.toFixed(2)}
 
-Latest Quarterly Results (${latestQuarter.fiscalDateEnding}):
-- Revenue: ${formatNumber(latestQuarter.totalRevenue)}
-- Net Income: ${formatNumber(latestQuarter.netIncome)}
-- Operating Income: ${formatNumber(latestQuarter.operatingIncome)}
-
-Growth Metrics:
-- QoQ Revenue Growth: ${formatPercentage(qoqRevenueGrowth)}
-- YoY Revenue Growth: ${formatPercentage(yoyRevenueGrowth)}
-- QoQ Net Income Growth: ${formatPercentage(qoqIncomeGrowth)}
-- YoY Net Income Growth: ${formatPercentage(yoyIncomeGrowth)}
+Quarterly Performance:
+- Revenue Growth (QoQ): ${formatPercentage(qoqRevenueGrowth)}
+- Revenue Growth (YoY): ${formatPercentage(yoyRevenueGrowth)}
+- Net Income Growth (QoQ): ${formatPercentage(qoqIncomeGrowth)}
+- Net Income Growth (YoY): ${formatPercentage(yoyIncomeGrowth)}
 
 Financial Health:
-- Current Ratio: ${currentRatio.toFixed(2)}
-- Debt-to-Equity: ${debtToEquity.toFixed(2)}
-- Profit Margin: ${overview.ProfitMargin}
-- Dividend Yield: ${overview.DividendYield || '0'}%
+- Current Ratio: ${formatNumber(currentRatio)}
+- Debt-to-Equity: ${formatNumber(debtToEquity)}
 
-Additional Insights:
-- Quarterly Earnings Growth YoY: ${overview.QuarterlyEarningsGrowthYOY}
-- Quarterly Revenue Growth YoY: ${overview.QuarterlyRevenueGrowthYOY}
+Company Overview:
+${overview.Description}
 
-Please provide:
-1. A brief overview of the company's current position
-2. Analysis of financial performance and growth trends
-3. Key strengths and potential risks
-4. A forward-looking perspective based on the data
-5. Any notable red flags or opportunities for investors
+Please provide a comprehensive analysis of this stock, including:
+1. Overall financial health and stability
+2. Growth trends and potential
+3. Key risks and opportunities
+4. Recommendation for investors
 
-Keep the analysis professional but easy to understand. Highlight the most important points that investors should focus on.`;
+Keep the analysis clear, concise, and focused on the most important aspects that investors should consider.`;
 
-    try {
-      const response = await anthropic.messages.create({
-        model: 'claude-3-opus-20240229',
-        max_tokens: 1500,
-        temperature: 0.7,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      });
+    const message = await anthropic.messages.create({
+      model: 'claude-3-opus-20240229',
+      max_tokens: 1000,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
 
-      return response.content[0].text;
-    } catch (aiError: any) {
-      console.error('Error calling Claude API:', aiError);
-      throw new Error(`AI Analysis failed: ${aiError.message}`);
-    }
-  } catch (error: any) {
-    console.error('Error in analyzeStock:', error);
-    // Throw the original error message for better debugging
-    throw new Error(error.message || 'Failed to analyze stock data');
+    return message.content[0].text;
+  } catch (error) {
+    console.error('Error analyzing stock:', error);
+    throw error;
   }
 }

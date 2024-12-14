@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StockForecast } from '@/components/StockForecast'
 import { StockSearchInput } from '@/components/StockSearchInput'
-import { StockData, FinancialMetrics } from './types'
+import { StockData, FinancialMetrics, HistoricalData } from './types'
 import { PriceChart } from '@/components/charts/PriceChart'
 import { RevenueChart } from '@/components/charts/RevenueChart'
 import { BalanceSheetChart } from '@/components/charts/BalanceSheetChart'
@@ -23,10 +23,11 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [stockData, setStockData] = useState<StockData | null>(null)
+  const [historicalData, setHistoricalData] = useState<HistoricalData | null>(null)
   const [hasData, setHasData] = useState(false)
-  const [financialStatements, setFinancialStatements] = useState<any>(null);
-  const [showQuarterly, setShowQuarterly] = useState(false);
-  const [activeTab, setActiveTab] = useState('analysis');
+  const [financialStatements, setFinancialStatements] = useState<any>(null)
+  const [showQuarterly, setShowQuarterly] = useState(false)
+  const [activeTab, setActiveTab] = useState('analysis')
 
   const handleAnalyze = async () => {
     if (!ticker) {
@@ -39,62 +40,52 @@ export default function Home() {
     setAnalysis('')
 
     try {
-      // First fetch the stock data
-      const response = await fetch(`/api/stock/${ticker.toUpperCase()}`)
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch stock data')
-      }
-      
-      // Validate the data structure
-      if (!data.historicalPrices || !Array.isArray(data.historicalPrices)) {
-        throw new Error('Invalid stock data format')
-      }
-
-      // Ensure all required financial metrics are present with fallback values
-      const metrics: FinancialMetrics = {
-        profitMargin: parseFloat(data.overview?.ProfitMargin || '0'),
-        operatingMargin: parseFloat(data.overview?.OperatingMarginTTM || '0'),
-        returnOnAssets: parseFloat(data.overview?.ReturnOnAssetsTTM || '0'),
-        returnOnEquity: parseFloat(data.overview?.ReturnOnEquityTTM || '0')
-      }
-
-      // Validate and transform the data
-      const validatedData: StockData = {
-        ...data,
-        financials: {
-          incomeStatement: data.financials?.incomeStatement || [],
-          balanceSheet: data.financials?.balanceSheet || []
-        },
-        metrics,
-        historicalPrices: data.historicalPrices.map((price: any) => ({
-          date: price.date,
-          open: Number(price.open) || 0,
-          high: Number(price.high) || 0,
-          low: Number(price.low) || 0,
-          close: Number(price.close) || 0,
-          volume: Number(price.volume) || 0
-        }))
-      }
-      
-      setStockData(validatedData)
-      setHasData(true)
-
-      // Then get the AI analysis
-      const result = await analyzeStock(ticker)
-      setAnalysis(result)
-
       const [priceData, historicalData, statements] = await Promise.all([
         getFinancialData(ticker),
         getHistoricalPrices(ticker),
         getAllFinancialStatements(ticker, showQuarterly)
       ]);
 
-      setStockData(priceData);
-      setHistoricalData(historicalData);
+      // Transform priceData to match StockData type
+      const transformedStockData: StockData = {
+        symbol: priceData.symbol,
+        name: priceData.symbol,
+        metrics: {
+          profitMargin: 0,
+          operatingMargin: 0,
+          returnOnAssets: 0,
+          returnOnEquity: 0
+        },
+        historicalPrices: priceData.historicalPrices.map(p => ({
+          date: p.date,
+          open: p.price,
+          high: p.price,
+          low: p.price,
+          close: p.price,
+          volume: 0
+        }))
+      };
+
+      const transformedHistoricalData: HistoricalData = {
+        prices: historicalData.map(price => ({
+          date: price.date,
+          open: price.open,
+          high: price.high,
+          low: price.low,
+          close: price.close,
+          volume: price.volume
+        }))
+      };
+
+      setStockData(transformedStockData);
+      setHistoricalData(transformedHistoricalData);
       setFinancialStatements(statements);
-      setActiveTab('analysis');
+      setHasData(true);
+
+      // Get AI analysis
+      const result = await analyzeStock(ticker)
+      setAnalysis(result)
+      setActiveTab('analysis')
     } catch (error) {
       console.error('Error:', error)
       setError(error instanceof Error ? error.message : 'An error occurred while analyzing the stock')
@@ -106,124 +97,112 @@ export default function Home() {
 
   const handleStockSelect = (symbol: string) => {
     setTicker(symbol)
+    setError('')
     handleAnalyze()
   }
 
+  const toggleDataFrequency = async () => {
+    if (!ticker) return;
+    
+    setLoading(true);
+    try {
+      const statements = await getAllFinancialStatements(ticker, !showQuarterly);
+      setFinancialStatements(statements);
+      setShowQuarterly(!showQuarterly);
+    } catch (error) {
+      console.error('Error toggling data frequency:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen py-2">
-      <main className="flex flex-col items-center justify-center w-full flex-1 px-4 sm:px-20 text-center">
-        <h1 className="text-4xl sm:text-6xl font-bold mb-5">
-          AI Stock Analysis
-        </h1>
-        <StockSearchInput
-          onStockSelect={handleStockSelect}
-        />
-        {error && (
-          <Alert variant="destructive" className="mb-8">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+    <main className="flex min-h-screen flex-col items-center p-4 md:p-24 gap-4 bg-background">
+      <div className="z-10 max-w-5xl w-full items-center justify-between text-sm lg:flex">
+        <div className="fixed bottom-0 left-0 flex w-full justify-center bg-gradient-to-t pb-6 pt-8 backdrop-blur-2xl lg:static lg:w-auto lg:p-4">
+          <StockSearchInput onStockSelect={handleStockSelect} />
+        </div>
+        <div className="fixed left-0 top-0 flex w-full justify-center lg:static lg:w-auto">
+          <Button
+            onClick={handleAnalyze}
+            disabled={loading || !ticker}
+            className="w-32"
+          >
+            {loading ? 'Analyzing...' : 'Analyze'}
+          </Button>
+        </div>
+      </div>
 
-        {(hasData || ticker) && (
-          <Tabs value={activeTab} className="w-full" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="analysis">Analysis</TabsTrigger>
-              <TabsTrigger value="charts">Charts</TabsTrigger>
-              <TabsTrigger value="forecast">Forecast</TabsTrigger>
-              <TabsTrigger value="financials">Financials</TabsTrigger>
-            </TabsList>
+      {error && (
+        <Alert variant="destructive" className="mt-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-            <TabsContent value="analysis" className="mt-6">
-              <div className="bg-white rounded-lg p-6 shadow-sm">
-                <h2 className="text-2xl font-semibold mb-4">AI Analysis</h2>
-                {loading ? (
-                  <p>Analyzing stock data...</p>
-                ) : analysis ? (
-                  <div className="prose max-w-none">
-                    {analysis.split('\n').map((paragraph, index) => (
-                      <p key={index}>{paragraph}</p>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500">Enter a stock ticker to see the analysis</p>
-                )}
-              </div>
-            </TabsContent>
+      {hasData && (
+        <Tabs value={activeTab} className="w-full max-w-6xl space-y-4">
+          <TabsList>
+            <TabsTrigger value="analysis" onClick={() => setActiveTab('analysis')}>
+              Analysis
+            </TabsTrigger>
+            <TabsTrigger value="charts" onClick={() => setActiveTab('charts')}>
+              Charts
+            </TabsTrigger>
+            <TabsTrigger value="forecast" onClick={() => setActiveTab('forecast')}>
+              Forecast
+            </TabsTrigger>
+            <TabsTrigger value="financials" onClick={() => setActiveTab('financials')}>
+              Financials
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="charts" className="mt-6">
-              <div className="bg-white rounded-lg p-6 shadow-sm">
-                <h2 className="text-2xl font-semibold mb-4">Financial Charts</h2>
-                {stockData ? (
-                  <FinancialCharts
-                    incomeData={stockData.financials.incomeStatement}
-                    balanceSheet={stockData.financials.balanceSheet}
-                    historicalPrices={stockData.historicalPrices}
-                    metrics={stockData.metrics}
-                  />
-                ) : (
-                  <p className="text-gray-500">Enter a stock ticker to see the charts</p>
-                )}
-              </div>
-            </TabsContent>
+          <TabsContent value="analysis" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {stockData && <StockPriceHistory data={stockData} />}
+              {stockData && <VolumeChart data={stockData} />}
+              {stockData && <MovingAveragesChart data={stockData} />}
+              {stockData && <VolatilityChart data={stockData} />}
+            </div>
 
-            <TabsContent value="forecast" className="mt-6">
-              <div className="bg-white rounded-lg p-6 shadow-sm">
-                <h2 className="text-2xl font-semibold mb-4">Price Forecast</h2>
-                {ticker ? (
-                  <StockForecast ticker={ticker} />
-                ) : (
-                  <p className="text-gray-500">Enter a stock ticker to see the forecast</p>
-                )}
-              </div>
-            </TabsContent>
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
+              <pre className="whitespace-pre-wrap">{analysis}</pre>
+            </div>
+          </TabsContent>
 
-            <TabsContent value="financials" className="space-y-4">
-              <div className="flex justify-end mb-4">
-                <button
-                  onClick={() => setShowQuarterly(!showQuarterly)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  {showQuarterly ? 'Show Annual' : 'Show Quarterly'}
-                </button>
-              </div>
-              
-              {financialStatements ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <RevenueChart 
-                    data={financialStatements.incomeStatement} 
-                    quarterly={showQuarterly} 
-                  />
-                  <BalanceSheetChart 
-                    data={financialStatements.balanceSheet} 
-                    quarterly={showQuarterly} 
-                  />
-                  <CashFlowChart 
-                    data={financialStatements.cashFlow} 
-                    quarterly={showQuarterly} 
-                  />
-                  <FinancialMetricsChart 
-                    data={financialStatements.incomeStatement} 
-                    quarterly={showQuarterly} 
-                  />
+          <TabsContent value="charts" className="space-y-4">
+            {stockData && financialStatements && (
+              <FinancialCharts 
+                incomeData={financialStatements.incomeStatements}
+                balanceSheet={financialStatements.balanceSheets}
+                historicalPrices={stockData.historicalPrices}
+                metrics={stockData.metrics}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="forecast" className="space-y-4">
+            {stockData && <StockForecast ticker={stockData.symbol} />}
+          </TabsContent>
+
+          <TabsContent value="financials" className="space-y-4">
+            {financialStatements && (
+              <>
+                <div className="flex justify-end mb-4">
+                  <Button onClick={toggleDataFrequency} disabled={loading}>
+                    Show {showQuarterly ? 'Annual' : 'Quarterly'} Data
+                  </Button>
                 </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No financial data available
+                <div className="grid gap-4 md:grid-cols-2">
+                  <RevenueChart data={financialStatements.incomeStatements} />
+                  <FinancialMetricsChart data={financialStatements.incomeStatements} />
+                  <BalanceSheetChart data={financialStatements.balanceSheets} />
+                  <CashFlowChart data={financialStatements.cashFlowStatements} />
                 </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        )}
-
-        {stockData && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <StockPriceHistory data={stockData} />
-            <MovingAveragesChart data={stockData} />
-            <VolumeChart data={stockData} />
-            <VolatilityChart data={stockData} />
-          </div>
-        )}
-      </main>
-    </div>
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
+    </main>
   )
 }
