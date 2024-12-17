@@ -61,3 +61,24 @@ export interface HistoricalData {
     volume: number;
   }[];
 }
+
+export interface SocialPost {
+  platform: 'stocktwits' | 'reddit';
+  content: string;
+  sentiment: 'positive' | 'negative' | 'neutral';
+  timestamp: number;
+  author: string;
+  likes: number;
+  url: string | null;
+}
+
+export interface SentimentData {
+  overall: number;  // Range from -1 to 1
+  distribution: {
+    positive: number;
+    negative: number;
+    neutral: number;
+  };
+  total: number;
+  posts: SocialPost[];
+}

@@ -16,6 +16,7 @@ import { CashFlowChart } from '@/components/charts/CashFlowChart'
 import { FinancialMetricsChart } from '@/components/charts/FinancialMetricsChart'
 import { getFinancialData, getHistoricalPrices } from '@/app/services/financial'
 import { getAllFinancialStatements } from '@/app/services/financialStatements'
+import { SentimentAnalysis } from '@/components/SentimentAnalysis'
 
 export default function Home() {
   const [ticker, setTicker] = useState('')
@@ -141,19 +142,12 @@ export default function Home() {
 
       {hasData && (
         <Tabs value={activeTab} className="w-full max-w-6xl space-y-4">
-          <TabsList>
-            <TabsTrigger value="analysis" onClick={() => setActiveTab('analysis')}>
-              Analysis
-            </TabsTrigger>
-            <TabsTrigger value="charts" onClick={() => setActiveTab('charts')}>
-              Charts
-            </TabsTrigger>
-            <TabsTrigger value="forecast" onClick={() => setActiveTab('forecast')}>
-              Forecast
-            </TabsTrigger>
-            <TabsTrigger value="financials" onClick={() => setActiveTab('financials')}>
-              Financials
-            </TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="analysis">Analysis</TabsTrigger>
+            <TabsTrigger value="charts">Charts</TabsTrigger>
+            <TabsTrigger value="forecast">Forecast</TabsTrigger>
+            <TabsTrigger value="sentiment">Sentiment</TabsTrigger>
+            <TabsTrigger value="financials">Financials</TabsTrigger>
           </TabsList>
 
           <TabsContent value="analysis" className="space-y-4">
@@ -182,6 +176,10 @@ export default function Home() {
 
           <TabsContent value="forecast" className="space-y-4">
             {stockData && <StockForecast ticker={stockData.symbol} />}
+          </TabsContent>
+
+          <TabsContent value="sentiment" className="space-y-4">
+            <SentimentAnalysis symbol={ticker} />
           </TabsContent>
 
           <TabsContent value="financials" className="space-y-4">
