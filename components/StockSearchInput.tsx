@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 interface StockSearchInputProps {
@@ -61,10 +60,8 @@ export function StockSearchInput({ onStockSelect }: StockSearchInputProps) {
             setError(null);
           }}
           className="flex-1"
+          disabled={isLoading}
         />
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Loading..." : "Analyze"}
-        </Button>
       </form>
       {error && (
         <p className="text-sm text-red-500 mt-1">{error}</p>

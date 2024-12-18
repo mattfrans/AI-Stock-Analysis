@@ -17,6 +17,7 @@ import { FinancialMetricsChart } from '@/components/charts/FinancialMetricsChart
 import { getFinancialData, getHistoricalPrices } from '@/app/services/financial'
 import { getAllFinancialStatements } from '@/app/services/financialStatements'
 import { SentimentAnalysis } from '@/components/SentimentAnalysis'
+import { getErrorMessage } from '@/app/utils/errors'
 
 export default function Home() {
   const [ticker, setTicker] = useState('')
@@ -89,7 +90,7 @@ export default function Home() {
       setActiveTab('analysis')
     } catch (error) {
       console.error('Error:', error)
-      setError(error instanceof Error ? error.message : 'An error occurred while analyzing the stock')
+      setError(getErrorMessage(error))
       setHasData(false)
     } finally {
       setLoading(false)
@@ -119,19 +120,17 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 md:p-24 gap-4 bg-background">
-      <div className="z-10 max-w-5xl w-full items-center justify-between text-sm lg:flex">
-        <div className="fixed bottom-0 left-0 flex w-full justify-center bg-gradient-to-t pb-6 pt-8 backdrop-blur-2xl lg:static lg:w-auto lg:p-4">
+      <div className="z-10 max-w-5xl w-full items-center justify-between text-sm flex gap-4">
+        <div className="flex-1">
           <StockSearchInput onStockSelect={handleStockSelect} />
         </div>
-        <div className="fixed left-0 top-0 flex w-full justify-center lg:static lg:w-auto">
-          <Button
-            onClick={handleAnalyze}
-            disabled={loading || !ticker}
-            className="w-32"
-          >
-            {loading ? 'Analyzing...' : 'Analyze'}
-          </Button>
-        </div>
+        <Button
+          onClick={handleAnalyze}
+          disabled={loading || !ticker}
+          className="w-32"
+        >
+          {loading ? 'Analyzing...' : 'Analyze'}
+        </Button>
       </div>
 
       {error && (
@@ -142,12 +141,12 @@ export default function Home() {
 
       {hasData && (
         <Tabs value={activeTab} className="w-full max-w-6xl space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="analysis">Analysis</TabsTrigger>
-            <TabsTrigger value="charts">Charts</TabsTrigger>
-            <TabsTrigger value="forecast">Forecast</TabsTrigger>
-            <TabsTrigger value="sentiment">Sentiment</TabsTrigger>
-            <TabsTrigger value="financials">Financials</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="analysis" onClick={() => setActiveTab('analysis')}>Analysis</TabsTrigger>
+            <TabsTrigger value="charts" onClick={() => setActiveTab('charts')}>Charts</TabsTrigger>
+            <TabsTrigger value="forecast" onClick={() => setActiveTab('forecast')}>Forecast</TabsTrigger>
+            <TabsTrigger value="sentiment" onClick={() => setActiveTab('sentiment')}>Sentiment</TabsTrigger>
+            <TabsTrigger value="financials" onClick={() => setActiveTab('financials')}>Financials</TabsTrigger>
           </TabsList>
 
           <TabsContent value="analysis" className="space-y-4">

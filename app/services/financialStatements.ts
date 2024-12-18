@@ -18,14 +18,23 @@ export async function getBalanceSheet(symbol: string, quarterly = false): Promis
   try {
     const module = quarterly ? 'balanceSheetHistoryQuarterly' : 'balanceSheetHistory';
     const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=${module}`;
+    console.log('Fetching balance sheet from:', url);
+    
     const response = await fetch(url);
+    console.log('Balance sheet response status:', response.status);
     
     if (!response.ok) {
-      throw new Error('Failed to fetch balance sheet data');
+      throw new Error(`Failed to fetch balance sheet data: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('Balance sheet data received:', JSON.stringify(data, null, 2));
+    
     const balanceSheets = data.quoteSummary?.result?.[0]?.[module]?.balanceSheetStatements || [];
+
+    if (!balanceSheets.length) {
+      console.warn('No balance sheet data available for:', symbol);
+    }
 
     return balanceSheets.map((statement: any) => ({
       date: new Date(statement.endDate.raw * 1000).toISOString().split('T')[0],
@@ -46,14 +55,23 @@ export async function getIncomeStatement(symbol: string, quarterly = false): Pro
   try {
     const module = quarterly ? 'incomeStatementHistoryQuarterly' : 'incomeStatementHistory';
     const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=${module}`;
+    console.log('Fetching income statement from:', url);
+    
     const response = await fetch(url);
+    console.log('Income statement response status:', response.status);
     
     if (!response.ok) {
-      throw new Error('Failed to fetch income statement data');
+      throw new Error(`Failed to fetch income statement data: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('Income statement data received:', JSON.stringify(data, null, 2));
+    
     const incomeStatements = data.quoteSummary?.result?.[0]?.[module]?.incomeStatementHistory || [];
+
+    if (!incomeStatements.length) {
+      console.warn('No income statement data available for:', symbol);
+    }
 
     return incomeStatements.map((statement: any) => ({
       date: new Date(statement.endDate.raw * 1000).toISOString().split('T')[0],
@@ -74,14 +92,23 @@ export async function getCashFlow(symbol: string, quarterly = false): Promise<Fi
   try {
     const module = quarterly ? 'cashflowStatementHistoryQuarterly' : 'cashflowStatementHistory';
     const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=${module}`;
+    console.log('Fetching cash flow from:', url);
+    
     const response = await fetch(url);
+    console.log('Cash flow response status:', response.status);
     
     if (!response.ok) {
-      throw new Error('Failed to fetch cash flow data');
+      throw new Error(`Failed to fetch cash flow data: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('Cash flow data received:', JSON.stringify(data, null, 2));
+    
     const cashFlows = data.quoteSummary?.result?.[0]?.[module]?.cashflowStatements || [];
+
+    if (!cashFlows.length) {
+      console.warn('No cash flow data available for:', symbol);
+    }
 
     return cashFlows.map((statement: any) => ({
       date: new Date(statement.endDate.raw * 1000).toISOString().split('T')[0],

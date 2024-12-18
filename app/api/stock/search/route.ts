@@ -27,38 +27,28 @@ export async function GET(request: Request) {
   }
 
   try {
-    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
-    if (!apiKey) {
-      throw new Error('Alpha Vantage API key is not configured');
-    }
-
-    const searchUrl = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
-    console.log('Fetching data from Alpha Vantage');
+    console.log('Fetching data from Yahoo Finance');
+    const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=10&newsCount=0&enableFuzzyQuery=false&quotesQueryId=tss_match_phrase_query`;
     
     const response = await fetch(searchUrl);
     if (!response.ok) {
-      throw new Error(`Alpha Vantage API error: ${response.statusText}`);
+      throw new Error(`Yahoo Finance API error: ${response.statusText}`);
     }
 
     const data = await response.json();
-    if (data.Note) {
-      console.warn('Alpha Vantage API limit warning:', data.Note);
-      return NextResponse.json({ error: 'API rate limit reached. Please try again later.' }, { status: 429 });
-    }
+    console.log('Yahoo Finance response:', data);
 
-    const matches = data.bestMatches || [];
-    if (matches.length === 0) {
+    if (!data.quotes || data.quotes.length === 0) {
       return NextResponse.json({ error: 'Stock symbol not found' }, { status: 404 });
     }
 
     const result = {
-      results: matches.map((match: any) => ({
-        symbol: match['1. symbol'],
-        name: match['2. name'],
-        type: match['3. type'],
-        region: match['4. region'],
-        currency: match['8. currency'],
-        exchange: match['5. marketOpen'] ? 'US Exchange' : match['4. region'] + ' Exchange'
+      results: data.quotes.map((quote: any) => ({
+        symbol: quote.symbol,
+        name: quote.shortname || quote.longname || quote.symbol,
+        type: quote.quoteType,
+        exchange: quote.exchange,
+        currency: quote.currency || 'USD'
       }))
     };
 

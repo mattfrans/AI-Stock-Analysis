@@ -1,144 +1,104 @@
 import { StockData, CompanyOverview, DailyPrice, HistoricalPrice, FinancialData, TechnicalIndicators, YahooFinanceData } from '../types';
+import { FinancialServiceError } from '../utils/errors';
 
 // Debug logging
 console.log('Financial Service Initialization:', {
-  ALPHA_VANTAGE_API_KEY: process.env.ALPHA_VANTAGE_API_KEY ? 'Set' : 'Not Set',
   NODE_ENV: process.env.NODE_ENV,
   VERCEL_ENV: process.env.VERCEL_ENV
 });
 
-const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
-const ALPHA_VANTAGE_URL = 'https://www.alphavantage.co/query';
 const YAHOO_FINANCE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
-// Rate limiting with request queue
-class RateLimiter {
-  private queue: Array<() => Promise<any>> = [];
-  private processing = false;
-  private lastCallTime = 0;
-  private readonly RATE_LIMIT_DELAY = 12000; // 12 seconds to be safe (5 calls per minute)
-  private readonly MAX_RETRIES = 3;
-
-  async execute<T>(fn: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
-      this.queue.push(async () => {
-        try {
-          const result = await this.executeWithRetry(fn);
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        }
-      });
-      
-      if (!this.processing) {
-        this.processQueue();
-      }
-    });
-  }
-
-  private async executeWithRetry<T>(fn: () => Promise<T>, retries = 0): Promise<T> {
-    try {
-      const now = Date.now();
-      const timeSinceLastCall = now - this.lastCallTime;
-      
-      if (timeSinceLastCall < this.RATE_LIMIT_DELAY) {
-        const waitTime = this.RATE_LIMIT_DELAY - timeSinceLastCall;
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
-      
-      this.lastCallTime = Date.now();
-      return await fn();
-    } catch (error) {
-      if (retries < this.MAX_RETRIES && error instanceof Error && error.message.includes('rate limit')) {
-        await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
-        return this.executeWithRetry(fn, retries + 1);
-      }
-      throw error;
-    }
-  }
-
-  private async processQueue() {
-    if (this.processing || this.queue.length === 0) {
-      return;
-    }
-    
-    this.processing = true;
-    
-    while (this.queue.length > 0) {
-      const task = this.queue.shift();
-      if (task) {
-        await task();
-      }
-    }
-    
-    this.processing = false;
-  }
+// Helper function to validate stock symbol format
+function validateSymbol(symbol: string): boolean {
+  return /^[A-Z0-9.]{1,10}$/.test(symbol);
 }
 
-const rateLimiter = new RateLimiter();
-
-async function rateLimitedFetch(url: string) {
-  return rateLimiter.execute(async () => {
-    const sanitizedUrl = url.replace(ALPHA_VANTAGE_API_KEY || '', '[API_KEY]');
-    console.log('Fetching:', sanitizedUrl);
-    
+// Enhanced fetch with retry logic and better error handling
+async function enhancedFetch(url: string, retries = 3): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const response = await fetch(url);
       
+      if (response.status === 404) {
+        throw new FinancialServiceError(
+          'Stock symbol not found',
+          'INVALID_SYMBOL'
+        );
+      }
+      
+      if (response.status === 429) {
+        if (attempt < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+          continue;
+        }
+        throw new FinancialServiceError(
+          'Rate limit exceeded. Please try again later.',
+          'API_ERROR'
+        );
+      }
+      
       if (!response.ok) {
-        console.error('API Error:', {
-          status: response.status,
-          statusText: response.statusText,
-          url: sanitizedUrl
-        });
-        throw new Error(`API call failed: ${response.statusText} (${response.status})`);
-      }
-
-      const data = await response.json();
-      
-      // Check for Alpha Vantage error messages
-      if (data['Error Message']) {
-        console.error('Alpha Vantage Error:', data['Error Message']);
-        throw new Error(data['Error Message']);
+        throw new FinancialServiceError(
+          `API request failed with status ${response.status}`,
+          'API_ERROR'
+        );
       }
       
-      // Check for rate limit messages
-      if (data.Note && data.Note.includes('API call frequency')) {
-        console.error('Rate Limit Hit:', data.Note);
-        throw new Error('API rate limit exceeded');
-      }
-
-      return data;
+      return response;
     } catch (error) {
-      console.error('Fetch Error:', error);
-      throw error;
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      if (error instanceof FinancialServiceError) {
+        throw error;
+      }
+      
+      if (attempt === retries - 1) {
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          throw new FinancialServiceError(
+            'Unable to connect to the financial data service. Please check your internet connection.',
+            'NETWORK_ERROR',
+            error
+          );
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
     }
-  });
+  }
+  
+  throw new FinancialServiceError(
+    'Failed to fetch financial data after multiple attempts',
+    'NETWORK_ERROR',
+    lastError
+  );
 }
 
 // Yahoo Finance API call (no rate limiting needed)
 async function fetchYahooFinanceData(symbol: string) {
+  if (!validateSymbol(symbol)) {
+    throw new FinancialServiceError(
+      'Invalid stock symbol format',
+      'INVALID_SYMBOL'
+    );
+  }
+
   const interval = '1d';
   const range = '1y';
   const url = `${YAHOO_FINANCE_URL}/${symbol}?interval=${interval}&range=${range}`;
   
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.error('Yahoo Finance API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        url
-      });
-      throw new Error(`Yahoo Finance API call failed: ${response.statusText}`);
-    }
-    
+    const response = await enhancedFetch(url);
     const data = await response.json();
     
     // Validate the response structure
     if (!data?.chart?.result?.[0]?.indicators?.quote?.[0]) {
-      console.error('Invalid Yahoo Finance data structure:', data);
-      throw new Error('Invalid data received from Yahoo Finance');
+      throw new FinancialServiceError(
+        'Invalid data format received from API',
+        'DATA_FORMAT_ERROR'
+      );
     }
     
     const result = data.chart.result[0];
@@ -147,14 +107,19 @@ async function fetchYahooFinanceData(symbol: string) {
     
     // Validate required data points
     if (!quotes.close || !quotes.open || !quotes.high || !quotes.low || !quotes.volume) {
-      console.error('Missing required price data:', quotes);
-      throw new Error('Incomplete price data received from Yahoo Finance');
+      throw new FinancialServiceError(
+        'Missing required price data',
+        'DATA_FORMAT_ERROR'
+      );
     }
     
     // Get current price data
     const lastIndex = quotes.close.length - 1;
     if (lastIndex < 0) {
-      throw new Error('No price data available');
+      throw new FinancialServiceError(
+        'No price data available',
+        'DATA_FORMAT_ERROR'
+      );
     }
     
     const dailyPrice: DailyPrice = {
@@ -180,84 +145,100 @@ async function fetchYahooFinanceData(symbol: string) {
 
     return { dailyPrice, historicalPrices };
   } catch (error) {
-    console.error('Error fetching Yahoo Finance data:', error);
-    if (error instanceof Error) {
+    if (error instanceof FinancialServiceError) {
       throw error;
     }
-    throw new Error('Failed to fetch stock data from Yahoo Finance');
+    
+    console.error('Error fetching Yahoo Finance data:', error);
+    throw new FinancialServiceError(
+      'Failed to fetch Yahoo Finance data',
+      'API_ERROR',
+      error
+    );
   }
 }
 
-export interface FinancialData {
-  symbol: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  previousClose: number;
-  open: number;
-  dayHigh: number;
-  dayLow: number;
-  volume: number;
-  marketCap?: number;
-}
-
 export async function getFinancialData(symbol: string): Promise<FinancialData> {
-  try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch financial data');
-    }
+  if (!validateSymbol(symbol)) {
+    throw new FinancialServiceError(
+      'Invalid stock symbol format',
+      'INVALID_SYMBOL'
+    );
+  }
 
+  try {
+    // Fixed URL construction - there was an extra slash after the base URL
+    const url = `${YAHOO_FINANCE_URL}${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+    console.log('Fetching financial data from:', url);
+    
+    const response = await enhancedFetch(url);
     const data = await response.json();
     
+    console.log('Received data:', JSON.stringify(data, null, 2));
+    
     if (!data.chart?.result?.[0]) {
-      throw new Error('Invalid data format received');
+      console.error('Invalid data structure:', data);
+      throw new FinancialServiceError(
+        'Invalid data format received from API',
+        'DATA_FORMAT_ERROR'
+      );
     }
 
     const result = data.chart.result[0];
-    const quote = result.indicators.quote[0];
     const meta = result.meta;
-    const timestamp = result.timestamp[result.timestamp.length - 1];
-    const currentPrice = meta.regularMarketPrice;
-    const previousClose = meta.previousClose;
+    
+    if (!meta.regularMarketPrice) {
+      console.error('Missing market data:', meta);
+      throw new FinancialServiceError(
+        'No market data available for this symbol',
+        'DATA_FORMAT_ERROR'
+      );
+    }
 
-    return {
+    const financialData = {
       symbol: symbol,
-      price: currentPrice,
-      change: currentPrice - previousClose,
-      changePercent: ((currentPrice - previousClose) / previousClose) * 100,
-      previousClose: previousClose,
+      price: meta.regularMarketPrice,
+      change: meta.regularMarketPrice - meta.previousClose,
+      changePercent: ((meta.regularMarketPrice - meta.previousClose) / meta.previousClose) * 100,
+      previousClose: meta.previousClose,
       open: meta.regularMarketOpen,
       dayHigh: meta.regularMarketDayHigh,
       dayLow: meta.regularMarketDayLow,
       volume: meta.regularMarketVolume,
       marketCap: meta.marketCap
     };
+
+    console.log('Processed financial data:', financialData);
+    return financialData;
   } catch (error) {
+    if (error instanceof FinancialServiceError) {
+      throw error;
+    }
+    
     console.error('Error fetching financial data:', error);
-    throw error;
+    throw new FinancialServiceError(
+      'Failed to fetch financial data',
+      'API_ERROR',
+      error
+    );
   }
 }
 
 export async function getHistoricalPrices(symbol: string): Promise<YahooFinanceData[]> {
+  if (!validateSymbol(symbol)) {
+    throw new FinancialServiceError(
+      'Invalid stock symbol format',
+      'INVALID_SYMBOL'
+    );
+  }
+
   const endDate = Math.floor(Date.now() / 1000);
   const startDate = endDate - (5 * 365 * 24 * 60 * 60); // 5 years ago
 
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${startDate}&period2=${endDate}&interval=1d`;
   
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.error('Historical Prices API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        url
-      });
-      throw new Error(`Failed to fetch historical prices: ${response.statusText}`);
-    }
-    
+    const response = await enhancedFetch(url);
     const data = await response.json();
     const timestamps = data.chart.result[0].timestamp;
     const quotes = data.chart.result[0].indicators.quote[0];
@@ -271,8 +252,16 @@ export async function getHistoricalPrices(symbol: string): Promise<YahooFinanceD
       open: quotes.open[index] || 0
     }));
   } catch (error) {
+    if (error instanceof FinancialServiceError) {
+      throw error;
+    }
+    
     console.error('Error fetching historical prices:', error);
-    return [];
+    throw new FinancialServiceError(
+      'Failed to fetch historical prices',
+      'API_ERROR',
+      error
+    );
   }
 }
 
@@ -311,52 +300,12 @@ export function calculateTechnicalIndicators(prices: YahooFinanceData[]) {
 }
 
 export async function getStockData(symbol: string): Promise<StockData> {
-  if (!ALPHA_VANTAGE_API_KEY) {
-    throw new Error('ALPHA_VANTAGE_API_KEY is not configured');
-  }
-
   console.log('Starting stock data fetch for:', symbol);
 
   try {
     // Fetch price data from Yahoo Finance (no rate limit)
     console.log('Fetching price data from Yahoo Finance...');
     const { dailyPrice, historicalPrices } = await fetchYahooFinanceData(symbol);
-
-    // 1. Fetch company overview from Alpha Vantage
-    console.log('Fetching company overview...');
-    const overviewUrl = `${ALPHA_VANTAGE_URL}?function=OVERVIEW&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`;
-    const overview = await rateLimitedFetch(overviewUrl);
-    
-    // Log the overview data to debug
-    console.log('Overview data received:', overview);
-    
-    // Check if we got a valid response with actual data
-    if (!overview || Object.keys(overview).length === 0) {
-      throw new Error(`No overview data available for symbol: ${symbol}`);
-    }
-
-    // Alpha Vantage sometimes returns an empty object for invalid symbols
-    if (!overview.Symbol && !overview.Name) {
-      throw new Error(`Invalid stock symbol: ${symbol}`);
-    }
-
-    // 2. Fetch income statement
-    console.log('Fetching income statement...');
-    const incomeUrl = `${ALPHA_VANTAGE_URL}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`;
-    const incomeStatement = await rateLimitedFetch(incomeUrl);
-
-    if (!incomeStatement.quarterlyReports || !incomeStatement.quarterlyReports.length) {
-      throw new Error('Failed to fetch income statement data');
-    }
-
-    // 3. Fetch balance sheet
-    console.log('Fetching balance sheet...');
-    const balanceUrl = `${ALPHA_VANTAGE_URL}?function=BALANCE_SHEET&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`;
-    const balanceSheet = await rateLimitedFetch(balanceUrl);
-
-    if (!balanceSheet.quarterlyReports || !balanceSheet.quarterlyReports.length) {
-      throw new Error('Failed to fetch balance sheet data');
-    }
 
     // Fetch 5-year historical prices
     console.log('Fetching 5-year historical prices...');
@@ -368,13 +317,8 @@ export async function getStockData(symbol: string): Promise<StockData> {
     console.log('Successfully fetched all data for:', symbol);
 
     return {
-      overview,
       dailyPrice,
       historicalPrices: fiveYearHistoricalPrices,
-      financials: {
-        incomeStatement,
-        balanceSheet
-      },
       technicalIndicators
     };
   } catch (error: unknown) {
