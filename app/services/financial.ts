@@ -20,7 +20,13 @@ async function enhancedFetch(url: string, retries = 3): Promise<Response> {
   
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          'Accept': 'application/json',
+          'Origin': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        }
+      });
       
       if (response.status === 404) {
         throw new FinancialServiceError(
@@ -31,7 +37,7 @@ async function enhancedFetch(url: string, retries = 3): Promise<Response> {
       
       if (response.status === 429) {
         if (attempt < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
           continue;
         }
         throw new FinancialServiceError(
@@ -41,6 +47,7 @@ async function enhancedFetch(url: string, retries = 3): Promise<Response> {
       }
       
       if (!response.ok) {
+        console.error('API error:', response.status, response.statusText);
         throw new FinancialServiceError(
           `API request failed with status ${response.status}`,
           'API_ERROR'
@@ -49,31 +56,23 @@ async function enhancedFetch(url: string, retries = 3): Promise<Response> {
       
       return response;
     } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error);
       lastError = error instanceof Error ? error : new Error(String(error));
       
-      if (error instanceof FinancialServiceError) {
-        throw error;
-      }
-      
       if (attempt === retries - 1) {
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-          throw new FinancialServiceError(
-            'Unable to connect to the financial data service. Please check your internet connection.',
-            'NETWORK_ERROR',
-            error
-          );
-        }
+        throw new FinancialServiceError(
+          'Failed to fetch data after multiple attempts',
+          'NETWORK_ERROR',
+          lastError
+        );
       }
       
-      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
     }
   }
   
-  throw new FinancialServiceError(
-    'Failed to fetch financial data after multiple attempts',
-    'NETWORK_ERROR',
-    lastError
-  );
+  throw lastError;
 }
 
 // Yahoo Finance API call (no rate limiting needed)
@@ -167,8 +166,8 @@ export async function getFinancialData(symbol: string): Promise<FinancialData> {
   }
 
   try {
-    // Fixed URL construction - there was an extra slash after the base URL
-    const url = `${YAHOO_FINANCE_URL}${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+    // Fixed URL construction - adding missing /chart/ and symbol
+    const url = `${YAHOO_FINANCE_URL}/${symbol}?interval=1d&range=1d`;
     console.log('Fetching financial data from:', url);
     
     const response = await enhancedFetch(url);

@@ -7,31 +7,39 @@ const CACHE_DURATION = 300; // 5 minutes in seconds
 const stockCache = new Map<string, { data: any; timestamp: number }>();
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const query = searchParams.get('q');
-
-  if (!query) {
-    return NextResponse.json({ error: 'Query parameter is required' }, { status: 400 });
-  }
-
-  const symbol = query.toUpperCase();
-  console.log('Searching for symbol:', symbol);
-
-  // Check cache first
-  const cachedData = stockCache.get(symbol);
-  const now = Math.floor(Date.now() / 1000);
-  
-  if (cachedData && (now - cachedData.timestamp) < CACHE_DURATION) {
-    console.log('Returning cached data for:', symbol);
-    return NextResponse.json(cachedData.data);
-  }
-
   try {
+    const { searchParams } = new URL(request.url);
+    const query = searchParams.get('q');
+
+    if (!query) {
+      return NextResponse.json({ error: 'Query parameter is required' }, { status: 400 });
+    }
+
+    const symbol = query.toUpperCase();
+    console.log('Searching for symbol:', symbol);
+
+    // Check cache first
+    const cachedData = stockCache.get(symbol);
+    const now = Math.floor(Date.now() / 1000);
+    
+    if (cachedData && (now - cachedData.timestamp) < CACHE_DURATION) {
+      console.log('Returning cached data for:', symbol);
+      return NextResponse.json(cachedData.data);
+    }
+
     console.log('Fetching data from Yahoo Finance');
     const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=10&newsCount=0&enableFuzzyQuery=false&quotesQueryId=tss_match_phrase_query`;
     
-    const response = await fetch(searchUrl);
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json',
+        'Origin': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      }
+    });
+
     if (!response.ok) {
+      console.error('Yahoo Finance API error:', response.status, response.statusText);
       throw new Error(`Yahoo Finance API error: ${response.statusText}`);
     }
 
@@ -52,12 +60,14 @@ export async function GET(request: Request) {
       }))
     };
 
+    // Cache the successful response
     stockCache.set(symbol, { data: result, timestamp: now });
+
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error searching stock symbol:', error);
+    console.error('Search error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch stock data. Please try again.' },
+      { error: error instanceof Error ? error.message : 'An unexpected error occurred' },
       { status: 500 }
     );
   }

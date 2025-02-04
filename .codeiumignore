@@ -1,0 +1,15 @@
+# Codeium Ignore Rules (Created 2025-02-05)
+
+# Always protect secrets
+.env*
+**/*_key.pem
+**/credentials/*
+
+# Allow analysis of dependency/config files
+#package.json
+#vercel.json
+
+# Exclude large binaries
+*.pdf
+*.zip
+*.bin
