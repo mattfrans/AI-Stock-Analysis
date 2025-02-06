@@ -102,6 +102,7 @@ if __name__ == "__main__":
         sys.exit(1)
         
     ticker = sys.argv[1]
+    print(f"Running forecast for {ticker}")
     try:
         result = generate_stock_forecast(ticker)
         print(json.dumps(result))

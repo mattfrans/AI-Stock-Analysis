@@ -1,4 +1,5 @@
 import { getStockData } from '@/app/services/financial'
+import { FinancialServiceError } from '@/app/utils/errors'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'

@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { analyzeStock } from './actions/analyze-stock'
-import { FinancialCharts, StockPriceHistory, VolumeChart, MovingAveragesChart, VolatilityChart } from '@/components/charts/FinancialCharts'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { StockForecast } from '@/components/StockForecast'
+import { FinancialCharts } from '@/components/charts/FinancialCharts';
+import { Alert } from '@/components/ui/alert'
+import { Tabs } from '@/components/ui/tabs'
+import { StockForecast } from '@/components/StockForecast';
 import { StockSearchInput } from '@/components/StockSearchInput'
 import { StockData, FinancialMetrics, HistoricalData } from './types'
 import { PriceChart } from '@/components/charts/PriceChart'
@@ -18,6 +17,9 @@ import { getFinancialData, getHistoricalPrices } from '@/app/services/financial'
 import { getAllFinancialStatements } from '@/app/services/financialStatements'
 import { SentimentAnalysis } from '@/components/SentimentAnalysis'
 import { getErrorMessage } from '@/app/utils/errors'
+import { analyzeStock } from "@/app/services/financial";
+import { generateFinancialStatement } from "@/app/services/financialStatements";
+import { FinancialServiceError } from "@/app/utils/errors";
 
 export default function Home() {
   const [ticker, setTicker] = useState('')
@@ -141,15 +143,15 @@ export default function Home() {
 
       {hasData && (
         <Tabs value={activeTab} className="w-full max-w-6xl space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="analysis" onClick={() => setActiveTab('analysis')}>Analysis</TabsTrigger>
-            <TabsTrigger value="charts" onClick={() => setActiveTab('charts')}>Charts</TabsTrigger>
-            <TabsTrigger value="forecast" onClick={() => setActiveTab('forecast')}>Forecast</TabsTrigger>
-            <TabsTrigger value="sentiment" onClick={() => setActiveTab('sentiment')}>Sentiment</TabsTrigger>
-            <TabsTrigger value="financials" onClick={() => setActiveTab('financials')}>Financials</TabsTrigger>
-          </TabsList>
+          <Tabs.List className="grid w-full grid-cols-5">
+            <Tabs.Trigger value="analysis" onClick={() => setActiveTab('analysis')}>Analysis</Tabs.Trigger>
+            <Tabs.Trigger value="charts" onClick={() => setActiveTab('charts')}>Charts</Tabs.Trigger>
+            <Tabs.Trigger value="forecast" onClick={() => setActiveTab('forecast')}>Forecast</Tabs.Trigger>
+            <Tabs.Trigger value="sentiment" onClick={() => setActiveTab('sentiment')}>Sentiment</Tabs.Trigger>
+            <Tabs.Trigger value="financials" onClick={() => setActiveTab('financials')}>Financials</Tabs.Trigger>
+          </Tabs.List>
 
-          <TabsContent value="analysis" className="space-y-4">
+          <Tabs.Content value="analysis" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {stockData && <StockPriceHistory data={stockData} />}
               {stockData && <VolumeChart data={stockData} />}
@@ -160,9 +162,9 @@ export default function Home() {
             <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
               <pre className="whitespace-pre-wrap">{analysis}</pre>
             </div>
-          </TabsContent>
+          </Tabs.Content>
 
-          <TabsContent value="charts" className="space-y-4">
+          <Tabs.Content value="charts" className="space-y-4">
             {stockData && financialStatements && (
               <FinancialCharts 
                 incomeData={financialStatements.incomeStatements}
@@ -171,17 +173,17 @@ export default function Home() {
                 metrics={stockData.metrics}
               />
             )}
-          </TabsContent>
+          </Tabs.Content>
 
-          <TabsContent value="forecast" className="space-y-4">
+          <Tabs.Content value="forecast" className="space-y-4">
             {stockData && <StockForecast ticker={stockData.symbol} />}
-          </TabsContent>
+          </Tabs.Content>
 
-          <TabsContent value="sentiment" className="space-y-4">
+          <Tabs.Content value="sentiment" className="space-y-4">
             <SentimentAnalysis symbol={ticker} />
-          </TabsContent>
+          </Tabs.Content>
 
-          <TabsContent value="financials" className="space-y-4">
+          <Tabs.Content value="financials" className="space-y-4">
             {financialStatements && (
               <>
                 <div className="flex justify-end mb-4">
@@ -197,7 +199,7 @@ export default function Home() {
                 </div>
               </>
             )}
-          </TabsContent>
+          </Tabs.Content>
         </Tabs>
       )}
     </main>

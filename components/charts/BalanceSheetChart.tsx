@@ -10,7 +10,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatLargeNumber } from '@/lib/utils';
+import { formatLargeNumber, cn } from "@/lib/utils";
 
 interface BalanceSheetChartProps {
   data: Array<{

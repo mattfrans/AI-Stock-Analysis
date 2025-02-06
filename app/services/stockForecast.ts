@@ -14,10 +14,8 @@ export interface ForecastResult {
 
 export async function generateStockForecast(ticker: string): Promise<ForecastResult> {
   return new Promise((resolve, reject) => {
-    const pythonProcess = spawn('python', [
-      path.join(process.cwd(), 'scripts', 'stock_forecast.py'),
-      ticker
-    ]);
+    const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'stock_forecast.py');
+    const pythonProcess = spawn('python', [scriptPath, ticker]);
 
     let dataString = '';
 

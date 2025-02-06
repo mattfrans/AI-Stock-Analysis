@@ -148,3 +148,7 @@ export async function getAllFinancialStatements(
     throw error;
   }
 }
+// app/services/financialStatements.ts
+export const generateFinancialStatement = () => {
+  // Implementation
+}

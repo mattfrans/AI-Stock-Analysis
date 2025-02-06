@@ -1,5 +1,13 @@
-import { StockData, CompanyOverview, DailyPrice, HistoricalPrice, FinancialData, TechnicalIndicators, YahooFinanceData } from '../types';
-import { FinancialServiceError } from '../utils/errors';
+import {
+  type CompanyOverview,
+  type StockData,
+  type DailyPrice,
+  type HistoricalPrice,
+  type FinancialData,
+  type TechnicalIndicators,
+  type YahooFinanceData
+} from '@/types';
+import { FinancialServiceError } from '@/app/utils/errors';
 
 // Debug logging
 console.log('Financial Service Initialization:', {
@@ -354,4 +362,8 @@ export function formatPercentage(value: string | number): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return 'N/A';
   return num.toFixed(2) + '%';
+}
+
+export const analyzeStock = (symbol: string) => {
+  // Implementation
 }

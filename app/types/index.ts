@@ -15,6 +15,8 @@ export interface CompanyOverview {
   QuarterlyRevenueGrowthYOY: string;
 }
 
+export type { CompanyOverview };
+
 export interface DailyPrice {
   date: string;
   open: string;
